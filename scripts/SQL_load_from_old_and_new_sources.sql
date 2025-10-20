@@ -1,6 +1,9 @@
 /* создание таблицы tmp_sources с данными из всех источников */
 DROP TABLE IF EXISTS tmp_sources;
-CREATE TEMP TABLE tmp_sources AS 
+CREATE TEMP TABLE tmp_sources as
+
+/* копирование данных во временную таблицу из старых источников*/
+
 SELECT  order_id,
         order_created_date,
         order_completion_date,
@@ -65,7 +68,33 @@ SELECT  t1.order_id,
         t3.customer_email
   FROM source3.craft_market_orders t1
     JOIN source3.craft_market_craftsmans t2 ON t1.craftsman_id = t2.craftsman_id 
-    JOIN source3.craft_market_customers t3 ON t1.customer_id = t3.customer_id;
+    JOIN source3.craft_market_customers t3 ON t1.customer_id = t3.customer_id
+    
+    /* копирование данных во временную таблицу из новых источников*/  
+    
+UNION
+	SELECT
+		t1.order_id,
+        t1.order_created_date,
+        t1.order_completion_date,
+        t1.order_status,
+        t1.craftsman_id,
+        t1.craftsman_name,
+        t1.craftsman_address,
+        t1.craftsman_birthday,
+        t1.craftsman_email,
+        t1.product_id,
+        t1.product_name,
+        t1.product_description,
+        t1.product_type,
+        t1.product_price,
+        t1.customer_id,
+        t2.customer_name,
+        t2.customer_address,
+        t2.customer_birthday,
+        t2.customer_email
+	FROM external_source.craft_products_orders t1
+		JOIN external_source.customers t2 ON t1.customer_id = t2.customer_id;
 
 /* обновление существующих записей и добавление новых в dwh.d_craftsmans */
 MERGE INTO dwh.d_craftsman d
