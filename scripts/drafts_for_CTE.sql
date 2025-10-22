@@ -65,7 +65,11 @@ FROM (
 ) AS T3;
 
 
--- расчет по новым данным
+
+/* Делаем расчёт витрины по новым данным. 
+ * Этой информации по заказчикам в рамках расчётного периода раньше не было, это новые данные. 
+ * Их можно просто вставить (insert) в витрину без обновления */
+
 SELECT 
 	T7.customer_id AS customer_id,
 	T7.customer_name AS customer_name,
@@ -142,7 +146,66 @@ JOIN
     ) AS T5
 ) AS T6 ON T2.customer_id = T6.customer_id_T6 AND T6.rank_count_product_type = 1
 
-) AS T7 ORDER BY report_period
+) AS T7 ORDER BY report_period;
+
+
+
+/* Делаем перерасчёт для существующих записей витринs, так как данные обновились за отчётные периоды. 
+ * Логика похожа на insert, но нужно достать конкретные данные из DWH */
+
+DROP TABLE IF EXISTS dwh_update_delta CASCADE;
+CREATE TABLE IF NOT EXISTS dwh_update_delta AS (
+	SELECT customer_id AS customer_id
+	FROM dwh_delta dd
+		WHERE dd.exist_customer_id IS NOT NULL
+);
+
+
+    SUM(dprod.product_price) AS customer_costs,
+    SUM(dprod.product_price)*0.1 AS platform_money,
+    COUNT(fo.order_id) AS total_order_count,
+    AVG(dprod.product_price) AS avg_order_price,
+    
+    SUM(CASE WHEN fo.order_status = 'created' THEN 1 ELSE 0 END) AS count_order_created,
+    SUM(CASE WHEN fo.order_status = 'in progress' THEN 1 ELSE 0 END) AS count_order_in_progress,
+    SUM(CASE WHEN fo.order_status = 'delivery' THEN 1 ELSE 0 END) AS count_order_delivery,
+    SUM(CASE WHEN fo.order_status = 'done' THEN 1 ELSE 0 END) AS count_order_done,
+    SUM(CASE WHEN fo.order_status != 'done' THEN 1 ELSE 0 END) AS count_order_not_done,
+    PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY T1.diff_order_date) AS median_time_order_completed,
+
+SELECT
+
+	dcust.customer_id AS customer_id,
+    dcust.customer_name AS customer_name,
+    dcust.customer_address AS customer_address,
+    dcust.customer_birthday AS customer_birthday,
+    dcust.customer_email AS customer_email,
+    fo.order_completion_date - fo.order_created_date AS diff_order_date,
+    dprod.product_id AS product_id,
+    dprod.product_price AS product_price,
+    dprod.product_type AS product_type,
+    dcraft.craftsman_id AS craftsman_id,
+    
+    
+    TO_CHAR(fo.order_created_date, 'yyyy-mm') AS report_period
+
+FROM dwh.f_order fo
+JOIN dwh.d_craftsman dcraft ON fo.craftsman_id = dcraft.craftsman_id
+JOIN dwh.d_customer dcust ON fo.customer_id = dcust.customer_id
+JOIN dwh.d_product dprod ON fo.product_id = dprod.product_id
+JOIN dwh_update_delta ud ON fo.customer_id = ud.customer_id
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

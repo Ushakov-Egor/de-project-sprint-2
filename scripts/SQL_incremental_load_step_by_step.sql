@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS dwh.load_dates_customer_report_datamart (
     CONSTRAINT load_dates_customer_report_datamart_pk PRIMARY KEY (id)
 );
 
--- определяем, какие данные были изменены в витрине или добавлены в DWH, формируем дельту изменений
-DROP TABLE IF EXISTS dwh_delta CASCADE;
+-- Определяем, какие данные были изменены в витрине или добавлены в DWH, формируем дельту изменений
+DROP TABLE IF EXISTS dwh_delta;
 CREATE TABLE IF NOT EXISTS dwh_delta AS (
 	SELECT
 		fo.customer_id AS customer_id,
@@ -41,8 +41,9 @@ CREATE TABLE IF NOT EXISTS dwh_delta AS (
 );
 
 
-/* делаем выборку заказчкиов, по которым были изменения в DWH. 
+/* Делаем выборку заказчкиов, по которым были изменения в DWH. 
  * По этим заказчикам данные в витрине нужно обновить */
+
 DROP TABLE IF EXISTS dwh_update_delta CASCADE;
 CREATE TABLE IF NOT EXISTS dwh_update_delta AS (
 	SELECT customer_id AS customer_id
@@ -86,7 +87,7 @@ CREATE TABLE IF NOT EXISTS dwh_delta_insert_result AS (
 	        T1.customer_email AS customer_email,
 	        SUM(T1.product_price) AS customer_costs,
 	        SUM(T1.product_price)*0.1 AS platform_money,
-	        COUNT(order_id) AS total_order_count,
+	        COUNT(T1.order_id) AS total_order_count,
 	        AVG(T1.product_price) AS avg_order_price,
 	        PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY T1.diff_order_date) AS median_time_order_completed,
 	        SUM(CASE WHEN T1.order_status = 'created' THEN 1 ELSE 0 END) AS count_order_created,
@@ -135,7 +136,8 @@ CREATE TABLE IF NOT EXISTS dwh_delta_insert_result AS (
 	) AS T7 ORDER BY report_period
 );
 
-
+/* Делаем перерасчёт для существующих записей витринs, так как данные обновились за отчётные периоды. 
+ * Логика похожа на insert, но нужно достать конкретные данные из DWH */
 
 
 
