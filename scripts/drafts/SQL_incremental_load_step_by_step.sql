@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS dwh_delta AS (
 		fo.order_id AS order_id,
 		fo.order_completion_date - fo.order_created_date AS diff_order_date,
 		fo.order_status AS order_status,
-		TO_CHAR(fo.order_created_date, 'yyyy-mm') AS report_period
+		TO_CHAR(fo.order_created_date, 'yyyy-mm') AS report_period,
+		dcraft.load_dttm AS craftsman_load_dttm,
+		dcust.load_dttm AS customers_load_dttm,
+		dprod.load_dttm AS products_load_dttm
 		
 	FROM dwh.f_order fo
 	JOIN dwh.d_craftsman dcraft ON fo.craftsman_id = dcraft.craftsman_id
@@ -68,8 +71,8 @@ CREATE TABLE IF NOT EXISTS dwh_delta_insert_result AS (
 	    T7.total_order_count AS total_order_count,
 	    T7.avg_order_price AS avg_order_price,
 	    T7.median_time_order_completed AS median_time_order_completed,
-	    T7.top_craftsman_id AS top_craftsman_id,
 	    T7.top_product_type AS top_product_category,
+	    T7.top_craftsman_id AS top_craftsman_id,
 	    T7.count_order_created AS count_order_created,
 	    T7.count_order_in_progress AS count_order_in_progress,
 	    T7.count_order_delivery AS count_order_delivery,
@@ -139,8 +142,8 @@ CREATE TABLE IF NOT EXISTS dwh_delta_insert_result AS (
 /* Делаем перерасчёт для существующих записей витрины, так как данные обновились за отчётные периоды. 
  * Логика похожа на insert, но нужно достать конкретные данные из DWH */
 
-DROP TABLE IF EXISTS dwh_update_delta CASCADE;
-CREATE TABLE IF NOT EXISTS dwh_update_delta AS (
+DROP TABLE IF EXISTS dwh_delta_update_result CASCADE;
+CREATE TABLE IF NOT EXISTS dwh_delta_update_result AS (
 	SELECT 
 		T7.customer_id AS customer_id,
 		T7.customer_name AS customer_name,
@@ -152,8 +155,8 @@ CREATE TABLE IF NOT EXISTS dwh_update_delta AS (
 	    T7.total_order_count AS total_order_count,
 	    T7.avg_order_price AS avg_order_price,
 	    T7.median_time_order_completed AS median_time_order_completed,
-	    T7.top_craftsman_id AS top_craftsman_id,
 	    T7.top_product_type AS top_product_category,
+	    T7.top_craftsman_id AS top_craftsman_id,
 	    T7.count_order_created AS count_order_created,
 	    T7.count_order_in_progress AS count_order_in_progress,
 	    T7.count_order_delivery AS count_order_delivery,
@@ -219,10 +222,89 @@ CREATE TABLE IF NOT EXISTS dwh_update_delta AS (
 );
 
 
+/* Выполняем вставку ноывх значений из таблицы dwh_delta_insert_result.
+ * Этиъ значений не было в витрине. */
+
+INSERT INTO dwh.customer_report_datamart (
+	customer_id,
+	customer_name,
+	customer_address,
+	customer_birthday,
+	customer_email,
+	customer_costs,
+	platform_money,
+	total_order_count,
+	avg_order_price,
+	median_time_order_completed,
+	top_product_category,
+	top_craftsman_id,
+	count_order_created,
+	count_order_in_progress,
+	count_order_delivery,
+	count_order_done,
+	count_order_not_done,
+	report_period
+)
+SELECT 
+	src.customer_id,
+	src.customer_name,
+	src.customer_address,
+	src.customer_birthday,
+	src.customer_email,
+	src.customer_costs,
+	src.platform_money,
+	src.total_order_count,
+	src.avg_order_price,
+	src.median_time_order_completed,
+	src.top_product_category,
+	src.top_craftsman_id,
+	src.count_order_created,
+	src.count_order_in_progress,
+	src.count_order_delivery,
+	src.count_order_done,
+	src.count_order_not_done,
+	src.report_period
+	
+FROM public.dwh_delta_insert_result as src;
+
+
+/* Обновление уже существующих записей в витрине данными из таблицы dwh_update_delta */
+
+UPDATE dwh.customer_report_datamart AS T1
+SET 
+	customer_id = T2.customer_id,
+	customer_name = T2.customer_name,
+	customer_address = T2.customer_address,
+	customer_birthday = T2.customer_birthday,
+	customer_email = T2.customer_email,
+	customer_costs = T2.customer_costs,
+	platform_money = T2.platform_money,
+	total_order_count = T2.total_order_count,
+	avg_order_price = T2.avg_order_price,
+	median_time_order_completed = T2.median_time_order_completed,
+	top_product_category = T2.top_product_category,
+	top_craftsman_id = T2.top_craftsman_id,
+	count_order_created = T2.count_order_created,
+	count_order_in_progress = T2.count_order_in_progress,
+	count_order_delivery = T2.count_order_delivery,
+	count_order_done = T2.count_order_done,
+	count_order_not_done = T2.count_order_not_done,
+	report_period = T2.report_period
+
+FROM public.dwh_delta_update_result AS T2
+WHERE T1.customer_id = T2.customer_id;
 
 
 
-
+/* Запись врмени последнего обновления в таблицу load_dates_customer_report_datamart */
+INSERT INTO dwh.load_dates_customer_report_datamart (load_dttm)
+SELECT 
+	GREATEST(
+		COALESCE(MAX(craftsman_load_dttm), NOW()), 
+	    COALESCE(MAX(customers_load_dttm), NOW()), 
+	    COALESCE(MAX(products_load_dttm), NOW())
+	) 
+FROM public.dwh_delta
 
 
 

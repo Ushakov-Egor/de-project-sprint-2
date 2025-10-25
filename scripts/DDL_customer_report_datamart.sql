@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS dwh.customer_report_datamart (
 	platform_money INT NOT NULL, -- сумма, которую заработала платформа от покупок заказчика за месяц (10% от суммы, которую потратил заказчик)
 	total_order_count INT, -- количество заказов у заказчика за месяц
 	avg_order_price DECIMAL(10,2) NOT NULL, -- средняя стоимость одного заказа у заказчика за месяц
-	median_time_order_completed NUMERIC(10,1) NOT NULL, -- медианное время в днях от момента создания заказа до его завершения за месяц
+	median_time_order_completed NUMERIC(10,1), -- медианное время в днях от момента создания заказа до его завершения за месяц
 	top_product_category VARCHAR NOT NULL, -- самая популярная категория товаров у этого заказчика за месяц
 	top_craftsman_id BIGINT NOT NULL, -- идентификатор самого популярного мастера ручной работы у заказчика. Если заказчик сделал одинаковое количество заказов у нескольких мастеров, возьмите любого
 	count_order_created INT NOT NULL, -- количество созданных заказов за месяц
